@@ -1,0 +1,26 @@
+[package]
+name = "tilem"
+version = "0.1.0"
+edition = "2021"
+description = "TilEm TI-84 Plus emulator for the reMarkable Paper Pro Move"
+
+[[bin]]
+name = "tilem"
+path = "src/bin/tilem/main.rs"
+
+[dependencies]
+libc = "0.2"
+cgmath = "0.18"
+image = "0.24"
+fontdue = "0.9"
+log = "0.4"
+env_logger = "0.11"
+
+[build-dependencies]
+cc = "1"
+bindgen = "0.70"
+
+[profile.release]
+opt-level = 3
+lto = true
+strip = true

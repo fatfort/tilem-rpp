@@ -1,0 +1,9 @@
+{
+    "name": "Tilem",
+    "description": "TI-84 Plus emulator (tilem). Requires /home/root/ti84plus.rom (copy via scp; non-redistributable).",
+    "application": "./tilem",
+    "qtfb": true,
+    "disablesWindowedMode": false,
+    "supportsVirtualKeyboard": false,
+    "aspectRatio": "auto"
+}
