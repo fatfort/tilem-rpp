@@ -97,7 +97,10 @@ fn main() {
         let now = Instant::now();
 
         // Input first, so keys affect the current tick.
-        router.pump(&rx, &mut emu);
+        let key_dirty = router.pump(&rx, &mut emu, &mut display, &km);
+        for r in &key_dirty {
+            display.partial_refresh(r);
+        }
 
         // Advance emulator by elapsed wall-clock time (microseconds).
         let mut dt = now.duration_since(last_tick);

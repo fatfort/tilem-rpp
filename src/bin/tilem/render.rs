@@ -184,17 +184,23 @@ fn draw_key_labels(display: &mut QtfbDisplay, x: i32, y: i32, w: i32, h: i32, ke
 }
 
 /// Render the 96x64 LCD buffer into the on-screen LCD rectangle.
-/// `frame` is W*H bytes (0 = off).
+/// `frame` is W*H bytes (0 = off).  Binary render (ON=black, OFF=white)
+/// looks sharpest on e-ink and sidesteps the contrast=0 black-out that the
+/// rM2 port had — a fresh ROM boots at contrast 0 and the user would
+/// otherwise see a solid black square.
 pub fn draw_lcd(display: &mut QtfbDisplay, frame: &[u8], fw: u32, fh: u32, contrast: u8) -> mxcfb_rect {
     let sx = LCD_X as i32;
     let sy = LCD_Y as i32;
 
-    // Low-contrast -> mostly black (matches rM2 behavior).
-    if contrast == 0 || frame.is_empty() {
+    // contrast==0 means the LCD is off (calc halted / not yet turned on).  The
+    // frame buffer returned by tilem is malloc'd (not calloc'd) and tilem does
+    // not fill it in the off-state, so rendering it shows uninitialized noise.
+    // Paint white — an asleep calculator has a blank screen.
+    if contrast == 0 || frame.is_empty() || fw == 0 || fh == 0 {
         display.fill_rect(
             Point2 { x: sx, y: sy },
             Vector2 { x: LCD_W, y: LCD_H },
-            color::BLACK,
+            color::WHITE,
         );
         return lcd_rect();
     }
@@ -218,6 +224,71 @@ pub fn draw_lcd(display: &mut QtfbDisplay, frame: &[u8], fw: u32, fh: u32, contr
         }
     }
     lcd_rect()
+}
+
+/// Fill a single key rect with a "pressed" look and return its bounds for
+/// partial refresh.  Called while the user's finger is on the key.
+pub fn draw_key_pressed(display: &mut QtfbDisplay, rect: (i32, i32, i32, i32, i32)) -> mxcfb_rect {
+    let (_, x, y, w, h) = rect;
+    display.fill_rect(
+        Point2 { x, y },
+        Vector2 {
+            x: w as u32,
+            y: h as u32,
+        },
+        color::MEDIUM_GRAY,
+    );
+    display.draw_rect(
+        Point2 { x, y },
+        Vector2 {
+            x: w as u32,
+            y: h as u32,
+        },
+        3,
+        color::BLACK,
+    );
+    mxcfb_rect {
+        top: y.max(0) as u32,
+        left: x.max(0) as u32,
+        width: w as u32,
+        height: h as u32,
+    }
+}
+
+/// Repaint a single key in its idle state.  Uses the keymap to find its
+/// labels.  Returns the rect for partial refresh.
+pub fn draw_key_idle(
+    display: &mut QtfbDisplay,
+    keymap: &[Vec<crate::keymap::Key>],
+    rect: (i32, i32, i32, i32, i32),
+) -> mxcfb_rect {
+    let (sc, x, y, w, h) = rect;
+    display.fill_rect(
+        Point2 { x, y },
+        Vector2 {
+            x: w as u32,
+            y: h as u32,
+        },
+        color::WHITE,
+    );
+    display.draw_rect(
+        Point2 { x, y },
+        Vector2 {
+            x: w as u32,
+            y: h as u32,
+        },
+        2,
+        color::BLACK,
+    );
+    if let Some(k) = find_key(keymap, sc) {
+        draw_key_labels(display, x, y, w, h, k);
+    }
+    mxcfb_rect {
+        top: y.max(0) as u32,
+        left: x.max(0) as u32,
+        width: w as u32,
+        height: h as u32,
+    }
 }
 
 pub fn lcd_rect() -> mxcfb_rect {
