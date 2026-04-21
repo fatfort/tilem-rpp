@@ -33,7 +33,7 @@ fn main() {
         unsafe { std::env::set_var("RUST_LOG", "INFO") };
     }
     env_logger::init();
-    log::info!("TilEm starting on Move");
+    log::info!("TilEm starting");
     setup_signals();
 
     // ROM + save paths (user must scp a ROM into place; see manifest description).
@@ -54,6 +54,7 @@ fn main() {
     log::info!("Save: {}", save_path.display());
 
     let mut display = rmpp_hal::display::QtfbDisplay::new();
+    render::init(display.width(), display.height());
     let (tx, rx) = std::sync::mpsc::channel::<InputEvent>();
     start_input_threads(tx, display.socket_fd());
 
@@ -72,12 +73,13 @@ fn main() {
     };
 
     let km = keymap::keymap();
+    let l = render::layout();
     let rects = keymap::layout(
         &km,
-        render::KEYPAD_X as i32,
-        render::KEYPAD_Y as i32,
-        render::KEYPAD_W as i32,
-        render::KEYPAD_H as i32,
+        l.keypad_x as i32,
+        l.keypad_y as i32,
+        l.keypad_w as i32,
+        l.keypad_h as i32,
     );
     let mut router = TouchRouter::new(rects);
 
@@ -142,32 +144,45 @@ fn main() {
 fn draw_error(display: &mut rmpp_hal::display::QtfbDisplay, rom_path: &std::path::Path, msg: &str) {
     use crate::rmpp_hal::types::color;
     use cgmath::Point2;
+    let s = render::layout().ui_scale;
     display.clear();
     display.draw_text(
-        Point2 { x: 40.0, y: 80.0 },
+        Point2 {
+            x: 40.0 * s,
+            y: 80.0 * s,
+        },
         "TilEm — ROM load failed",
-        56.0,
+        56.0 * s,
         color::BLACK,
         false,
     );
     display.draw_text(
-        Point2 { x: 40.0, y: 180.0 },
+        Point2 {
+            x: 40.0 * s,
+            y: 180.0 * s,
+        },
         &format!("Expected ROM at: {}", rom_path.display()),
-        32.0,
+        32.0 * s,
         color::DARK_GRAY,
         false,
     );
     display.draw_text(
-        Point2 { x: 40.0, y: 240.0 },
+        Point2 {
+            x: 40.0 * s,
+            y: 240.0 * s,
+        },
         msg,
-        28.0,
+        28.0 * s,
         color::DARK_GRAY,
         false,
     );
     display.draw_text(
-        Point2 { x: 40.0, y: 320.0 },
+        Point2 {
+            x: 40.0 * s,
+            y: 320.0 * s,
+        },
         "Copy a TI-84+ ROM to /home/root/ti84plus.rom and restart.",
-        28.0,
+        28.0 * s,
         color::DARK_GRAY,
         false,
     );

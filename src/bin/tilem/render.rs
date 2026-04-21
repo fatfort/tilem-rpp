@@ -1,43 +1,104 @@
 use crate::keymap::Key;
-use crate::rmpp_hal::display::{QtfbDisplay, RMPP_HEIGHT, RMPP_WIDTH};
+use crate::rmpp_hal::display::QtfbDisplay;
 use crate::rmpp_hal::types::{color, mxcfb_rect};
 use cgmath::{Point2, Vector2};
+use std::sync::OnceLock;
 
-pub const DISPLAY_W: u32 = RMPP_WIDTH;
-pub const DISPLAY_H: u32 = RMPP_HEIGHT;
-
-// LCD region (TI-84+: 96x64 monochrome; scale up ~8x to 768x512).
-pub const LCD_SCALE: u32 = 8;
 pub const LCD_NATIVE_W: u32 = 96;
 pub const LCD_NATIVE_H: u32 = 64;
-pub const LCD_W: u32 = LCD_NATIVE_W * LCD_SCALE;
-pub const LCD_H: u32 = LCD_NATIVE_H * LCD_SCALE;
 
-pub const HEADER_H: u32 = 80;
-pub const LCD_X: u32 = (DISPLAY_W - LCD_W) / 2;
-pub const LCD_Y: u32 = HEADER_H + 16;
+/// All pixel-space dimensions, computed once at startup from the actual
+/// display size reported by the HAL.  The reference units are the Move's
+/// 954×1696; ferrari scales up ~1.698× by width ratio.
+pub struct Layout {
+    pub display_w: u32,
+    pub display_h: u32,
+    pub lcd_scale: u32,
+    pub lcd_w: u32,
+    pub lcd_h: u32,
+    pub header_h: u32,
+    pub lcd_x: u32,
+    pub lcd_y: u32,
+    pub keypad_x: u32,
+    pub keypad_y: u32,
+    pub keypad_w: u32,
+    pub keypad_h: u32,
+    pub header_font: f32,
+    pub ui_scale: f32,
+}
 
-pub const KEYPAD_X: u32 = 10;
-pub const KEYPAD_Y: u32 = LCD_Y + LCD_H + 24;
-pub const KEYPAD_W: u32 = DISPLAY_W - 2 * KEYPAD_X;
-pub const KEYPAD_H: u32 = DISPLAY_H - KEYPAD_Y - 16;
+impl Layout {
+    fn new(display_w: u32, display_h: u32) -> Self {
+        let ui_scale = display_w as f32 / 954.0;
+
+        // LCD: scale 96×64 native monochrome up to a readable block.
+        // Move: 8× → 768×512.  Ferrari: 14× → 1344×896.
+        let lcd_scale = ((8.0 * ui_scale).round() as u32).max(4);
+        let lcd_w = LCD_NATIVE_W * lcd_scale;
+        let lcd_h = LCD_NATIVE_H * lcd_scale;
+
+        let header_h = ((80.0 * ui_scale).round() as u32).max(40);
+        let lcd_x = display_w.saturating_sub(lcd_w) / 2;
+        let lcd_y = header_h + (16.0 * ui_scale).round() as u32;
+        let keypad_x = (10.0 * ui_scale).round() as u32;
+        let keypad_y = lcd_y + lcd_h + (24.0 * ui_scale).round() as u32;
+        let keypad_w = display_w.saturating_sub(2 * keypad_x);
+        let keypad_h = display_h
+            .saturating_sub(keypad_y)
+            .saturating_sub((16.0 * ui_scale).round() as u32);
+        let header_font = 40.0 * ui_scale;
+
+        Self {
+            display_w,
+            display_h,
+            lcd_scale,
+            lcd_w,
+            lcd_h,
+            header_h,
+            lcd_x,
+            lcd_y,
+            keypad_x,
+            keypad_y,
+            keypad_w,
+            keypad_h,
+            header_font,
+            ui_scale,
+        }
+    }
+}
+
+static LAYOUT: OnceLock<Layout> = OnceLock::new();
+
+pub fn init(display_w: u32, display_h: u32) -> &'static Layout {
+    LAYOUT.get_or_init(|| Layout::new(display_w, display_h))
+}
+
+pub fn layout() -> &'static Layout {
+    LAYOUT
+        .get()
+        .expect("render::init must be called before layout()")
+}
 
 pub fn draw_chrome(display: &mut QtfbDisplay, keymap: &[Vec<Key>]) {
+    let l = layout();
     display.clear();
 
     // Header band.
     display.fill_rect(
         Point2 { x: 0, y: 0 },
         Vector2 {
-            x: DISPLAY_W,
-            y: HEADER_H,
+            x: l.display_w,
+            y: l.header_h,
         },
         color::HEADER_BG,
     );
     display.draw_text(
-        Point2 { x: 24.0, y: 18.0 },
+        Point2 {
+            x: 24.0 * l.ui_scale,
+            y: 18.0 * l.ui_scale,
+        },
         "TilEm — TI-84 Plus",
-        40.0,
+        l.header_font,
         color::WHITE,
         false,
     );
@@ -45,12 +106,12 @@ pub fn draw_chrome(display: &mut QtfbDisplay, keymap: &[Vec<Key>]) {
     // LCD frame (black border).
     display.draw_rect(
         Point2 {
-            x: LCD_X as i32 - 4,
-            y: LCD_Y as i32 - 4,
+            x: l.lcd_x as i32 - 4,
+            y: l.lcd_y as i32 - 4,
         },
         Vector2 {
-            x: LCD_W + 8,
-            y: LCD_H + 8,
+            x: l.lcd_w + 8,
+            y: l.lcd_h + 8,
         },
         2,
         color::BLACK,
@@ -60,23 +121,24 @@ pub fn draw_chrome(display: &mut QtfbDisplay, keymap: &[Vec<Key>]) {
 }
 
 pub fn draw_keypad_static(display: &mut QtfbDisplay, keymap: &[Vec<Key>]) {
+    let l = layout();
     let rects = crate::keymap::layout(
         keymap,
-        KEYPAD_X as i32,
-        KEYPAD_Y as i32,
-        KEYPAD_W as i32,
-        KEYPAD_H as i32,
+        l.keypad_x as i32,
+        l.keypad_y as i32,
+        l.keypad_w as i32,
+        l.keypad_h as i32,
     );
 
     // Paint keypad background white so leftover artifacts get cleared.
     display.fill_rect(
         Point2 {
-            x: KEYPAD_X as i32,
-            y: KEYPAD_Y as i32,
+            x: l.keypad_x as i32,
+            y: l.keypad_y as i32,
         },
         Vector2 {
-            x: KEYPAD_W,
-            y: KEYPAD_H,
+            x: l.keypad_w,
+            y: l.keypad_h,
         },
         color::WHITE,
     );
@@ -188,9 +250,16 @@ fn draw_key_labels(display: &mut QtfbDisplay, x: i32, y: i32, w: i32, h: i32, ke
 /// looks sharpest on e-ink and sidesteps the contrast=0 black-out that the
 /// rM2 port had — a fresh ROM boots at contrast 0 and the user would
 /// otherwise see a solid black square.
-pub fn draw_lcd(display: &mut QtfbDisplay, frame: &[u8], fw: u32, fh: u32, contrast: u8) -> mxcfb_rect {
-    let sx = LCD_X as i32;
-    let sy = LCD_Y as i32;
+pub fn draw_lcd(
+    display: &mut QtfbDisplay,
+    frame: &[u8],
+    fw: u32,
+    fh: u32,
+    contrast: u8,
+) -> mxcfb_rect {
+    let l = layout();
+    let sx = l.lcd_x as i32;
+    let sy = l.lcd_y as i32;
 
     // contrast==0 means the LCD is off (calc halted / not yet turned on).  The
     // frame buffer returned by tilem is malloc'd (not calloc'd) and tilem does
@@ -199,13 +268,16 @@ pub fn draw_lcd(display: &mut QtfbDisplay, frame: &[u8], fw: u32, fh: u32, contr
     if contrast == 0 || frame.is_empty() || fw == 0 || fh == 0 {
         display.fill_rect(
             Point2 { x: sx, y: sy },
-            Vector2 { x: LCD_W, y: LCD_H },
+            Vector2 {
+                x: l.lcd_w,
+                y: l.lcd_h,
+            },
             color::WHITE,
         );
         return lcd_rect();
     }
 
-    let scale = LCD_SCALE as i32;
+    let scale = l.lcd_scale as i32;
     for py in 0..fh as i32 {
         for px in 0..fw as i32 {
             let v = frame[(py as usize) * (fw as usize) + px as usize];
@@ -292,10 +364,11 @@ pub fn draw_key_idle(
 }
 
 pub fn lcd_rect() -> mxcfb_rect {
+    let l = layout();
     mxcfb_rect {
-        top: LCD_Y,
-        left: LCD_X,
-        width: LCD_W,
-        height: LCD_H,
+        top: l.lcd_y,
+        left: l.lcd_x,
+        width: l.lcd_w,
+        height: l.lcd_h,
     }
 }
