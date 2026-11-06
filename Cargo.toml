@@ -2,7 +2,10 @@
 name = "tilem"
 version = "0.1.0"
 edition = "2021"
-description = "TilEm TI-84 Plus emulator for the reMarkable Paper Pro Move"
+description = "TilEm TI-84 Plus emulator for the reMarkable Paper Pro and Paper Pro Move (bring your own ROM)"
+license = "GPL-3.0-or-later"
+authors = ["Aayush Bajaj"]
+repository = "https://github.com/fatfort/tilem-move"
 
 [[bin]]
 name = "tilem"
