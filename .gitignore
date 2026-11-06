@@ -1,5 +1,6 @@
 target/
-Cargo.lock
+dist/
 *.rom
 *.sav
+*.8xu
 .DS_Store
