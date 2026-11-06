@@ -107,7 +107,7 @@ Open Font License 1.1 (`LICENSES/OFL.txt`). Every component and its licence is
 listed in `NOTICE.txt`; what we changed is in `CHANGES.md`.
 
 Ready-to-install builds are sold at [bazaar.abaj.ai](https://bazaar.abaj.ai).
-This repository, https://github.com/fatfort/tilem-move, is their complete
+This repository, https://github.com/fatfort/tilem-rpp, is their complete
 corresponding source; each release zip's `SOURCE.md` names the exact commit
 and build recipe. You are paying for the port, packaging and testing; you are
 free to build, modify and share it under the GPL.

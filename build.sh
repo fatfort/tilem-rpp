@@ -14,7 +14,7 @@
 set -eu
 cd "$(dirname "$0")"
 
-REPO_URL=${REPO_URL:-https://github.com/fatfort/tilem-move}
+REPO_URL=${REPO_URL:-https://github.com/fatfort/tilem-rpp}
 IMAGE=${IMAGE:-tilem-rm-build:1.94.1}
 TARGET=aarch64-unknown-linux-musl
 
